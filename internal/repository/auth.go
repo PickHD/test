@@ -52,6 +52,8 @@ func (ar *AuthRepostoryImpl) VerifyUser(ctx context.Context, req *model.LoginReq
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("user not found")
 		}
+
+		return nil, err
 	}
 
 	return &user, nil

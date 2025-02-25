@@ -2,9 +2,14 @@ package service
 
 import (
 	"context"
+	"errors"
 	"test/internal/config"
+	"test/internal/helper"
 	"test/internal/model"
 	"test/internal/repository"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type (
@@ -29,6 +34,13 @@ func NewAuthService(ctx context.Context, config *config.Configuration, authRepo 
 }
 
 func (as *AuthServiceImpl) Register(ctx context.Context, req *model.RegisterRequest) (*model.User, error) {
+	hashedPass, err := helper.HashPassword(req.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Password = hashedPass
+
 	result, err := as.AuthRepo.Create(ctx, req)
 	if err != nil {
 		return nil, err
@@ -43,7 +55,30 @@ func (as *AuthServiceImpl) Login(ctx context.Context, req *model.LoginRequest) (
 		return "", err
 	}
 
-	//TODO : generate jwt here
+	if isValid := helper.VerifyPassword(req.Password, user.Password); !isValid {
+		return "", errors.New("invalid credential")
+	}
 
-	return "", nil
+	token, err := as.generateJWT(user)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+func (as *AuthServiceImpl) generateJWT(user *model.User) (string, error) {
+	var JWTExpire = time.Duration(as.Config.Jwt.Expire) * time.Hour
+
+	claims := jwt.MapClaims{}
+	claims["id"] = user.ID
+	claims["exp"] = time.Now().Add(JWTExpire).Unix()
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signToken, err := token.SignedString([]byte(as.Config.Jwt.Secret))
+	if err != nil {
+		return "", err
+	}
+
+	return signToken, nil
 }
