@@ -37,5 +37,7 @@ func NewApplication() (*Application, error) {
 		&model.User{},
 	)
 
+	app.App = fiber.New()
+
 	return app, nil
 }
